@@ -7,7 +7,10 @@ import (
 const errorTypeName = "error"
 
 func Link[T any](funs ...interface{}) func(in ...interface{}) T {
-	wrapped := func(in ...interface{}) (result T) {
+	result := *new(T)
+	resultType := reflect.TypeOf(result)
+	resultValue := reflect.New(resultType).Elem()
+	wrapped := func(in ...interface{}) T {
 		values := make([]reflect.Value, len(in))
 		for i, v := range in {
 			values[i] = reflect.ValueOf(v)
@@ -18,7 +21,14 @@ func Link[T any](funs ...interface{}) func(in ...interface{}) T {
 			if funcType.Out(funcType.NumOut()-1).Name() == errorTypeName {
 				lastValue := values[len(values)-1]
 				if !lastValue.IsNil() {
-					return
+					for i := 0; i < resultType.NumField(); i++ {
+						field := resultType.Field(i)
+						if field.Type.Name() == errorTypeName {
+							resultValue.Field(i).Set(lastValue)
+							return resultValue.Interface().(T)
+						}
+					}
+					return result
 				}
 				values = values[:len(values)-1]
 			}
@@ -27,22 +37,20 @@ func Link[T any](funs ...interface{}) func(in ...interface{}) T {
 		for i, v := range values {
 			out[i] = v.Interface()
 		}
-		resultType := reflect.TypeOf(result)
 		if len(out) == 1 && resultType.Kind() == reflect.TypeOf(out[0]).Kind() {
 			return out[0].(T)
 		}
-		resultValue := reflect.ValueOf(result)
 		for i := 0; i < resultType.NumField(); i++ {
 			field := resultType.Field(i)
 			for j := 0; j < len(out); j++ {
-				if field.Name == reflect.TypeOf(out[j]).Name() {
+				if field.Type.Name() == reflect.TypeOf(out[j]).Name() {
 					resultValue.Field(i).Set(reflect.ValueOf(out[j]))
 					out = append(out[:j], out[j+1:]...)
 					break
 				}
 			}
 		}
-		return result
+		return resultValue.Interface().(T)
 	}
 	return wrapped
 }
