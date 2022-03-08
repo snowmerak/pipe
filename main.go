@@ -9,8 +9,8 @@ const errorTypeName = "error"
 func Link[T any](funs ...interface{}) func(in ...interface{}) T {
 	result := *new(T)
 	resultType := reflect.TypeOf(result)
-	resultValue := reflect.New(resultType).Elem()
 	wrapped := func(in ...interface{}) T {
+		resultValue := reflect.New(resultType).Elem()
 		values := make([]reflect.Value, len(in))
 		for i, v := range in {
 			values[i] = reflect.ValueOf(v)
